@@ -16,12 +16,14 @@ ENV PORT=8080
 WORKDIR /app
 
 # ---------------------------
-# System dependencies (minimal)
+# System dependencies (FAISS requires these)
 # ---------------------------
 RUN apt-get update && apt-get install -y \
     build-essential \
+    cmake \
+    git \
+    wget \
     && rm -rf /var/lib/apt/lists/*
-
 
 # ---------------------------
 # Copy only requirements first (better caching)
@@ -31,19 +33,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-
 # ---------------------------
-# Copy project files (after dependencies for caching)
+# Copy project files
 # ---------------------------
 COPY . .
 
 # ---------------------------
-# Expose port (for local use)
+# Health check (important for Cloud Run)
 # ---------------------------
-EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-
 # ---------------------------
-# Start Uvicorn server
+# Start Uvicorn server with longer timeout
 # ---------------------------
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--timeout-keep-alive", "300"]
